@@ -1346,6 +1346,7 @@
           isAdmin: false
         },
         registeredUsers: [],
+        profiles: {},
         puntki: 60,
         totalPuntkiEarned: 60,
         peneze: 10,
@@ -3515,10 +3516,15 @@
         return;
       }
 
+      const nickTaken = state.registeredUsers.some(u => u.nick.toLowerCase() === nick.toLowerCase()) ||
+        (state.profiles && state.profiles["u:" + nick.toLowerCase()]);
+      if (nickTaken) {
+        showAuthMsg("Táto prezývka už existuje. Vyber si inú alebo sa prihlás.", false);
+        return;
+      }
+
       state.registeredUsers.push({ nick, email, pass });
-      state.user.nickname = nick;
-      state.user.email = email;
-      state.user.loggedIn = true;
+      switchProfile({ nickname: nick, email, loggedIn: true, isAdmin: false });
       state.peneze += 50;
       saveState();
       updateHud();
@@ -3532,11 +3538,8 @@
       const pass = document.getElementById("loginPass").value;
 
       if (pass === "Martinusedino") {
-        state.user.isAdmin = true;
-        state.user.loggedIn = true;
-        if (!state.user.nickname || state.user.nickname === "Hosť z Východu") {
-          state.user.nickname = "Admin Martinus";
-        }
+        const adminNick = (state.user.loggedIn && state.user.nickname) ? state.user.nickname : "Admin Martinus";
+        switchProfile({ nickname: adminNick, email: state.user.email || "", loggedIn: true, isAdmin: true });
         saveState();
         updateHud();
         refreshAccountModalUI();
@@ -3545,21 +3548,31 @@
         return;
       }
 
+      const knownUser = state.registeredUsers.find(
+        u => (u.nick.toLowerCase() === ident || (u.email || "").toLowerCase() === ident)
+      );
+      if (knownUser && knownUser.pass && knownUser.pass !== pass) {
+        showAuthMsg("Nesprávne heslo pre tento účet.", false);
+        return;
+      }
+
       const foundUser = state.registeredUsers.find(
-        u => (u.nick.toLowerCase() === ident || u.email.toLowerCase() === ident) && u.pass === pass
+        u => (u.nick.toLowerCase() === ident || (u.email || "").toLowerCase() === ident) && u.pass === pass
       );
 
       if (foundUser) {
-        state.user.nickname = foundUser.nick;
-        state.user.email = foundUser.email;
-        state.user.loggedIn = true;
+        switchProfile({ nickname: foundUser.nick, email: foundUser.email || "", loggedIn: true, isAdmin: false });
         saveState();
         updateHud();
         refreshAccountModalUI();
         showAuthMsg(`Úspešne prihlásený ako ${foundUser.nick}!`, true);
       } else {
-        state.user.nickname = document.getElementById("loginIdent").value.trim() || "Východňar";
-        state.user.loggedIn = true;
+        switchProfile({
+          nickname: document.getElementById("loginIdent").value.trim() || "Východňar",
+          email: "",
+          loggedIn: true,
+          isAdmin: false
+        });
         saveState();
         updateHud();
         refreshAccountModalUI();
@@ -3571,9 +3584,8 @@
       e.preventDefault();
       const pass = document.getElementById("adminPassInput").value;
       if (pass === "Martinusedino") {
-        state.user.isAdmin = true;
-        state.user.loggedIn = true;
-        state.user.nickname = "Admin";
+        const adminNick2 = (state.user.loggedIn && state.user.nickname) ? state.user.nickname : "Admin";
+        switchProfile({ nickname: adminNick2, email: state.user.email || "", loggedIn: true, isAdmin: true });
         saveState();
         updateHud();
         refreshAccountModalUI();
@@ -3584,16 +3596,57 @@
       }
     }
 
+    // Každý účet má vlastný postup (puntki, dzedové peniaze, skiny, mapy, findy, questy...).
+    const PROGRESS_KEYS = [
+      "puntki", "totalPuntkiEarned", "peneze", "bestScore", "rebirthCount",
+      "activeSkinId", "activeMapId", "ownedSkins", "ownedMaps", "foundIds",
+      "quests", "inviteCode", "invitedCount", "inviteRewardClaimed"
+    ];
+
+    function profileKeyFor(user) {
+      return user && user.loggedIn && user.nickname
+        ? "u:" + String(user.nickname).trim().toLowerCase()
+        : "guest";
+    }
+
+    function cloneJson(v) {
+      return JSON.parse(JSON.stringify(v));
+    }
+
+    function pickProgress(src) {
+      const o = {};
+      PROGRESS_KEYS.forEach(k => { o[k] = cloneJson(src[k]); });
+      return o;
+    }
+
+    function switchProfile(newUser) {
+      const oldKey = profileKeyFor(state.user);
+      const newKey = profileKeyFor(newUser);
+      if (oldKey !== newKey) {
+        if (game.running) {
+          try { endGame(); } catch (_) {}
+        }
+        if (!state.profiles) state.profiles = {};
+        state.profiles[oldKey] = pickProgress(state);
+        const target = state.profiles[newKey] || pickProgress(getDefaultState());
+        PROGRESS_KEYS.forEach(k => { state[k] = cloneJson(target[k]); });
+        checkMidnightQuestReset(state, false);
+      }
+      state.user = { ...newUser };
+      if (state.activeTab === "admin" && !newUser.isAdmin) {
+        state.activeTab = "skins";
+      }
+      updateHud();
+      renderActiveTab();
+    }
+
     function logoutUser() {
-      state.user = {
+      switchProfile({
         nickname: "Hosť z Východu",
         email: "",
         loggedIn: false,
         isAdmin: false
-      };
-      if (state.activeTab === "admin") {
-        state.activeTab = "skins";
-      }
+      });
       saveState();
       updateHud();
       refreshAccountModalUI();
