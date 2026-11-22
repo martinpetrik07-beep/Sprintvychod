@@ -2,22 +2,23 @@
   "name": "Východňarský Dino",
   "short_name": "VýchodDino",
   "description": "Kockatá východňarská Dino hra s puntkami, dzedovými penezmi, 22 skinmi, 20 mapami, 100 findmi zo Slovenska, questami a online rebríčkom.",
-  "start_url": "./",
-  "scope": "./",
+  "start_url": "/Sprintvychod/",
+  "scope": "/Sprintvychod/",
   "display": "standalone",
   "background_color": "#0f172a",
   "theme_color": "#10b981",
   "orientation": "any",
   "lang": "sk",
+  "id": "https://martinpetrik07-beep.github.io/Sprintvychod/",
   "icons": [
     {
-      "src": "./icon-192.png",
+      "src": "/Sprintvychod/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "./icon-512.png",
+      "src": "/Sprintvychod/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
